@@ -1,0 +1,741 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Faculty Delay Dashboard — Offline Academics</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap');
+  :root {
+    --bg:#0f1117;--bg2:#161b27;--bg3:#1e2535;--bg4:#252d3f;
+    --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);
+    --text:#e8eaf0;--text2:#8892a4;--text3:#5a6478;
+    --accent:#f97316;--accent2:#fb923c;
+    --blue:#3b82f6;--green:#22c55e;--red:#ef4444;--amber:#f59e0b;--purple:#a78bfa;
+    --radius:10px;--radius-lg:14px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;line-height:1.6}
+
+  /* UPLOAD SCREEN */
+  .upload-screen{display:flex;align-items:center;justify-content:center;min-height:100vh;padding:24px}
+  .upload-box{background:var(--bg2);border:1px solid var(--border);border-radius:20px;padding:48px;max-width:520px;width:100%;text-align:center}
+  .upload-logo{width:56px;height:56px;background:var(--accent);border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 20px}
+  .upload-box h1{font-size:22px;font-weight:600;margin-bottom:8px}
+  .upload-box p{font-size:14px;color:var(--text2);margin-bottom:32px;line-height:1.7}
+  .upload-zone{border:2px dashed var(--border2);border-radius:14px;padding:36px 24px;cursor:pointer;transition:all 0.2s;margin-bottom:20px;position:relative}
+  .upload-zone:hover,.upload-zone.drag-over{border-color:var(--accent);background:rgba(249,115,22,0.05)}
+  .upload-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+  .upload-icon{font-size:36px;margin-bottom:12px}
+  .upload-zone h3{font-size:15px;font-weight:500;margin-bottom:6px}
+  .upload-zone p{font-size:12px;color:var(--text3);margin:0}
+  .sheet-pills{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:28px}
+  .pill{background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:5px 14px;font-size:11px;color:var(--text2);display:flex;align-items:center;gap:6px}
+  .pill-dot{width:6px;height:6px;border-radius:50%}
+  .upload-hint{font-size:11px;color:var(--text3)}
+
+  /* LOADING */
+  .loading-screen{display:none;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:16px}
+  .spinner{width:40px;height:40px;border:3px solid var(--bg3);border-top-color:var(--accent);border-radius:50%;animation:spin 0.8s linear infinite}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  .loading-text{font-size:14px;color:var(--text2)}
+
+  /* DASHBOARD */
+  .dashboard{display:none}
+  .header{background:var(--bg2);border-bottom:1px solid var(--border);padding:16px 32px;display:flex;align-items:center;gap:16px;position:sticky;top:0;z-index:100}
+  .header-icon{width:36px;height:36px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:18px}
+  .header h1{font-size:17px;font-weight:600}
+  .header p{font-size:12px;color:var(--text2);margin:0}
+  .header-right{margin-left:auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  .chip{background:var(--bg3);border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:11px;color:var(--text2);font-family:'DM Mono',monospace}
+  .chip.live{border-color:rgba(34,197,94,0.4);color:#4ade80;background:rgba(34,197,94,0.08)}
+  .btn-upload-new{background:transparent;border:1px solid var(--border2);color:var(--text2);border-radius:7px;padding:5px 12px;font-size:11px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:all 0.2s}
+  .btn-upload-new:hover{border-color:var(--accent);color:var(--accent)}
+  .main{padding:24px 32px;max-width:1400px;margin:0 auto}
+  .filters-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:16px 20px;margin-bottom:20px;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end}
+  .filter-group{display:flex;flex-direction:column;gap:5px;min-width:140px}
+  .filter-label{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3)}
+  select,input[type=date]{background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:7px;padding:7px 10px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none;cursor:pointer;transition:border-color 0.2s}
+  select:hover,input[type=date]:hover,select:focus,input[type=date]:focus{border-color:var(--accent)}
+  select option{background:var(--bg3)}
+  .btn-reset{background:transparent;border:1px solid var(--border2);color:var(--text2);border-radius:7px;padding:7px 14px;font-size:12px;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all 0.2s;align-self:flex-end}
+  .btn-reset:hover{border-color:var(--accent);color:var(--accent)}
+  .kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px}
+  .kpi-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 20px;position:relative;overflow:hidden;transition:border-color 0.2s,transform 0.15s}
+  .kpi-card:hover{border-color:var(--border2);transform:translateY(-1px)}
+  .kpi-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:2px 2px 0 0}
+  .kpi-card.orange::before{background:var(--accent)}
+  .kpi-card.blue::before{background:var(--blue)}
+  .kpi-card.green::before{background:var(--green)}
+  .kpi-card.purple::before{background:var(--purple)}
+  .kpi-icon{font-size:22px;margin-bottom:10px}
+  .kpi-label{font-size:11px;color:var(--text2);font-weight:500;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:4px}
+  .kpi-value{font-size:32px;font-weight:600;font-family:'DM Mono',monospace;line-height:1}
+  .kpi-card.orange .kpi-value{color:var(--accent2)}
+  .kpi-card.blue .kpi-value{color:#60a5fa}
+  .kpi-card.green .kpi-value{color:#4ade80}
+  .kpi-card.purple .kpi-value{color:var(--purple)}
+  .kpi-sub{font-size:11px;color:var(--text3);margin-top:4px}
+  .charts-row{display:grid;grid-template-columns:2fr 1fr;gap:14px;margin-bottom:20px}
+  .charts-row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:20px}
+  .card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);padding:18px 20px}
+  .card-title{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text2);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+  .card-title .dot{width:6px;height:6px;border-radius:50%;background:var(--accent)}
+  .chart-container{position:relative;width:100%}
+  .centre-bars{display:flex;flex-direction:column;gap:8px;max-height:280px;overflow-y:auto}
+  .centre-bar-row{display:flex;align-items:center;gap:8px}
+  .centre-name{font-size:11px;color:var(--text2);min-width:120px;max-width:120px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .centre-bar-track{flex:1;height:6px;background:var(--bg4);border-radius:3px}
+  .centre-bar-fill{height:100%;border-radius:3px}
+  .centre-val{font-size:10px;color:var(--text3);min-width:60px;text-align:right;font-family:'DM Mono',monospace}
+  .table-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius-lg);overflow:hidden;margin-bottom:20px}
+  .table-header{padding:16px 20px 12px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .table-search{background:var(--bg3);border:1px solid var(--border2);color:var(--text);border-radius:7px;padding:6px 12px;font-size:12px;font-family:'DM Sans',sans-serif;outline:none;width:220px;transition:border-color 0.2s}
+  .table-search:focus{border-color:var(--accent)}
+  .table-search::placeholder{color:var(--text3)}
+  .table-wrap{max-height:420px;overflow-y:auto}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  thead th{background:var(--bg3);padding:9px 14px;text-align:left;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--text3);position:sticky;top:0;z-index:2;border-bottom:1px solid var(--border);cursor:pointer;user-select:none}
+  thead th:hover{color:var(--text2)}
+  thead th.num{text-align:right}
+  tbody tr{border-bottom:1px solid var(--border);transition:background 0.1s}
+  tbody tr:last-child{border-bottom:none}
+  tbody tr:hover{background:var(--bg3)}
+  td{padding:9px 14px;color:var(--text)}
+  td.num{text-align:right;font-family:'DM Mono',monospace;font-size:12px;color:var(--text2)}
+  td.fac-name{font-weight:500}
+  .rank-num{color:var(--text3);font-family:'DM Mono',monospace;font-size:11px}
+  .pct-badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:5px;font-size:11px;font-weight:600;font-family:'DM Mono',monospace;white-space:nowrap}
+  .pct-high{background:rgba(239,68,68,0.15);color:#fca5a5}
+  .pct-mid{background:rgba(245,158,11,0.15);color:#fcd34d}
+  .pct-low{background:rgba(34,197,94,0.15);color:#86efac}
+  .pct-bar-wrap{display:flex;align-items:center;gap:6px}
+  .mini-bar{flex:1;height:4px;background:var(--bg4);border-radius:2px;min-width:50px}
+  .mini-fill{height:100%;border-radius:2px}
+  .fill-high{background:var(--red)}.fill-mid{background:var(--amber)}.fill-low{background:var(--green)}
+  .month-badges{display:flex;gap:6px;flex-wrap:wrap}
+  .month-badge{padding:4px 12px;border-radius:20px;font-size:11px;font-weight:500;cursor:pointer;border:1px solid var(--border2);color:var(--text2);background:transparent;transition:all 0.15s;font-family:'DM Sans',sans-serif}
+  .month-badge:hover,.month-badge.active{background:var(--accent);border-color:var(--accent);color:white}
+  .sort-arrow{color:var(--accent);margin-left:3px}
+  .no-data{text-align:center;padding:32px;color:var(--text3);font-size:13px}
+  .tabs{display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:14px}
+  .tab{padding:7px 14px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;cursor:pointer;color:var(--text3);border-bottom:2px solid transparent;transition:all 0.15s;margin-bottom:-1px}
+  .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+  .error-box{background:rgba(239,68,68,0.1);border:1px solid rgba(239,68,68,0.3);border-radius:10px;padding:14px 18px;font-size:13px;color:#fca5a5;margin-top:16px;display:none}
+  ::-webkit-scrollbar{width:5px;height:5px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:3px}
+  @media(max-width:900px){.kpi-grid{grid-template-columns:repeat(2,1fr)}.charts-row,.charts-row2{grid-template-columns:1fr}.main{padding:16px}.header{padding:14px 16px}}
+  @media(max-width:580px){.kpi-grid{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<!-- ── UPLOAD SCREEN ── -->
+<div class="upload-screen" id="uploadScreen">
+  <div class="upload-box">
+    <div class="upload-logo">📊</div>
+    <h1>Faculty Delay Dashboard</h1>
+    <p>Upload your <strong>Offline Academics Excel file</strong>.<br>
+       The dashboard will automatically read both sheets —<br>
+       <em>Faculty Delay</em> and <em>Total Classes</em>.</p>
+
+    <div class="sheet-pills">
+      <div class="pill"><div class="pill-dot" style="background:var(--accent)"></div>Faculty Delay sheet</div>
+      <div class="pill"><div class="pill-dot" style="background:var(--blue)"></div>Total Classes sheet</div>
+    </div>
+
+    <div class="upload-zone" id="uploadZone">
+      <input type="file" id="fileInput" accept=".xlsx,.xls" onchange="handleFile(this.files[0])">
+      <div class="upload-icon">📁</div>
+      <h3>Click to browse or drag & drop</h3>
+      <p>Supports .xlsx and .xls files</p>
+    </div>
+
+    <div class="error-box" id="errorBox"></div>
+    <div class="upload-hint">Your data stays local — nothing is uploaded to any server.</div>
+  </div>
+</div>
+
+<!-- ── LOADING ── -->
+<div class="loading-screen" id="loadingScreen">
+  <div class="spinner"></div>
+  <div class="loading-text" id="loadingText">Reading sheets…</div>
+</div>
+
+<!-- ── DASHBOARD ── -->
+<div class="dashboard" id="dashboard">
+
+  <header class="header">
+    <div class="header-icon">📊</div>
+    <div>
+      <h1>Faculty Delay Dashboard</h1>
+      <p id="headerSub">Offline Academics</p>
+    </div>
+    <div class="header-right">
+      <span class="chip" id="chipDelays">—</span>
+      <span class="chip" id="chipClasses">—</span>
+      <span class="chip" id="chipCentres">—</span>
+      <span class="chip live">● Both Sheets</span>
+      <button class="btn-upload-new" onclick="resetToUpload()">↑ New File</button>
+    </div>
+  </header>
+
+  <div class="main">
+
+    <!-- FILTERS -->
+    <div class="filters-card">
+      <div style="margin-right:4px">
+        <div class="filter-label" style="margin-bottom:6px">Quick month</div>
+        <div class="month-badges" id="monthBadges"></div>
+      </div>
+      <div class="filter-group">
+        <div class="filter-label">From date</div>
+        <input type="date" id="fromDate" onchange="applyFilters()">
+      </div>
+      <div class="filter-group">
+        <div class="filter-label">To date</div>
+        <input type="date" id="toDate" onchange="applyFilters()">
+      </div>
+      <div class="filter-group">
+        <div class="filter-label">Centre</div>
+        <select id="centreSel" onchange="applyFilters()">
+          <option value="">All centres</option>
+        </select>
+      </div>
+      <button class="btn-reset" onclick="resetFilters()">↺ Reset</button>
+    </div>
+
+    <!-- KPIs -->
+    <div class="kpi-grid">
+      <div class="kpi-card orange">
+        <div class="kpi-icon">⚡</div>
+        <div class="kpi-label">Total class delays</div>
+        <div class="kpi-value" id="kpiDelays">—</div>
+        <div class="kpi-sub">across selected period</div>
+      </div>
+      <div class="kpi-card blue">
+        <div class="kpi-icon">📚</div>
+        <div class="kpi-label">Total classes</div>
+        <div class="kpi-value" id="kpiTotal">—</div>
+        <div class="kpi-sub">from Total Classes sheet</div>
+      </div>
+      <div class="kpi-card green">
+        <div class="kpi-icon">📉</div>
+        <div class="kpi-label">Delay percentage</div>
+        <div class="kpi-value" id="kpiPct">—</div>
+        <div class="kpi-sub">of classes delayed</div>
+      </div>
+      <div class="kpi-card purple">
+        <div class="kpi-icon">👥</div>
+        <div class="kpi-label">Active faculties</div>
+        <div class="kpi-value" id="kpiFaculties">—</div>
+        <div class="kpi-sub">with classes in period</div>
+      </div>
+    </div>
+
+    <!-- TREND + CENTRE -->
+    <div class="charts-row">
+      <div class="card">
+        <div class="card-title"><div class="dot"></div>Monthly trend — Delays vs Total Classes</div>
+        <div class="chart-container" style="height:240px"><canvas id="trendChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><div class="dot" style="background:var(--blue)"></div>Top centres by delays</div>
+        <div class="tabs">
+          <div class="tab active" onclick="switchCentreTab(this,'count')">By Count</div>
+          <div class="tab" onclick="switchCentreTab(this,'pct')">By Delay %</div>
+        </div>
+        <div class="centre-bars" id="centreBars"></div>
+      </div>
+    </div>
+
+    <!-- PRODUCT + RATE -->
+    <div class="charts-row2">
+      <div class="card">
+        <div class="card-title"><div class="dot" style="background:var(--purple)"></div>Delays by product</div>
+        <div class="chart-container" style="height:190px"><canvas id="productChart"></canvas></div>
+      </div>
+      <div class="card">
+        <div class="card-title"><div class="dot" style="background:var(--green)"></div>Monthly delay rate trend</div>
+        <div class="chart-container" style="height:190px"><canvas id="rateChart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- FACULTY TABLE -->
+    <div class="table-card">
+      <div class="table-header">
+        <div class="card-title" style="margin:0"><div class="dot"></div>Faculty-wise breakdown</div>
+        <input type="text" class="table-search" placeholder="🔍  Search faculty or centre…" id="tableSearch" oninput="filterTable(this.value)">
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th style="width:36px">#</th>
+              <th onclick="sortTable('faculty')">Faculty <span class="sort-arrow" id="sort-faculty"></span></th>
+              <th onclick="sortTable('centre')">Primary Centre <span class="sort-arrow" id="sort-centre"></span></th>
+              <th class="num" onclick="sortTable('delays')">Delays <span class="sort-arrow" id="sort-delays">↓</span></th>
+              <th class="num" onclick="sortTable('total')">Total Classes <span class="sort-arrow" id="sort-total"></span></th>
+              <th class="num" onclick="sortTable('pct')">Delay % <span class="sort-arrow" id="sort-pct"></span></th>
+            </tr>
+          </thead>
+          <tbody id="facTableBody"></tbody>
+        </table>
+      </div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /dashboard -->
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────────
+let G = { ta:{}, da:{}, allDates:[], minDate:'', maxDate:'', months:[], centres:[], products:{} };
+let trendChart=null, productChart=null, rateChart=null;
+let _tableRows=[], _sortCol='delays', _sortAsc=false, _centreTabMode='count';
+
+// ── DRAG & DROP ────────────────────────────────────────────────────────────
+const zone = document.getElementById('uploadZone');
+zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('drag-over'); });
+zone.addEventListener('dragleave', () => zone.classList.remove('drag-over'));
+zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('drag-over'); handleFile(e.dataTransfer.files[0]); });
+
+// ── FILE HANDLER ───────────────────────────────────────────────────────────
+function handleFile(file) {
+  if (!file) return;
+  showError('');
+  showLoading('Reading Excel file…');
+
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      setLoading('Parsing sheets…');
+      const wb = XLSX.read(e.target.result, { type: 'array', cellDates: true });
+
+      // Find sheets (case-insensitive)
+      const findSheet = (keywords) => {
+        return wb.SheetNames.find(n => keywords.some(k => n.toLowerCase().includes(k.toLowerCase())));
+      };
+
+      const delaySheetName  = findSheet(['Faculty Delay', 'Delay']);
+      const totalSheetName  = findSheet(['Total Classes', 'Total']);
+
+      if (!delaySheetName) throw new Error('Could not find "Faculty Delay" sheet. Please check your Excel file.');
+      if (!totalSheetName) throw new Error('Could not find "Total Classes" sheet. Please check your Excel file.');
+
+      setLoading('Processing Faculty Delay sheet…');
+      const delayRows = XLSX.utils.sheet_to_json(wb.Sheets[delaySheetName], { defval: '' });
+
+      setLoading('Processing Total Classes sheet…');
+      const totalRows = XLSX.utils.sheet_to_json(wb.Sheets[totalSheetName], { defval: '' });
+
+      setLoading('Building dashboard data…');
+      buildData(delayRows, totalRows, file.name);
+
+    } catch (err) {
+      hideLoading();
+      showError(err.message || 'Failed to read file. Please check the format.');
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+// ── CLEAN FACULTY NAME ─────────────────────────────────────────────────────
+function cleanName(n) {
+  return String(n).trim()
+    .replace(/^(BY|by)\s+/i, '')
+    .replace(/ma'?am/gi, '')
+    .trim();
+}
+
+// ── DATE HELPER ────────────────────────────────────────────────────────────
+function toDateStr(val) {
+  if (!val) return null;
+  if (val instanceof Date) {
+    const y = val.getFullYear(), m = String(val.getMonth()+1).padStart(2,'0'), d = String(val.getDate()).padStart(2,'0');
+    return `${y}-${m}-${d}`;
+  }
+  // Excel serial number
+  if (typeof val === 'number') {
+    const d = XLSX.SSF.parse_date_code(val);
+    if (d) return `${d.y}-${String(d.m).padStart(2,'0')}-${String(d.d).padStart(2,'0')}`;
+  }
+  // String
+  const s = String(val).trim();
+  if (/^\d{4}-\d{2}-\d{2}/.test(s)) return s.slice(0,10);
+  return null;
+}
+
+// ── BUILD DATA ─────────────────────────────────────────────────────────────
+function buildData(delayRows, totalRows, filename) {
+  const da = {}; // {date: {centre: {faculty: count}}}
+  const ta = {}; // {date: {centre: {faculty: count}}}
+  const products = {}; // {product: count}
+
+  // Column name maps (flexible)
+  const col = (row, options) => {
+    for (const k of Object.keys(row)) {
+      if (options.some(o => k.toLowerCase().replace(/\s+/g,'').includes(o.toLowerCase().replace(/\s+/g,'')))) return row[k];
+    }
+    return '';
+  };
+
+  // Process Faculty Delay rows
+  delayRows.forEach(row => {
+    const faculty = cleanName(col(row, ['Faculty Name', 'FacultyName', 'Faculty']));
+    const centre  = String(col(row, ['Center Name', 'Centre Name', 'CentreName', 'Center']) || '').trim();
+    const product = String(col(row, ['Product Name', 'ProductName', 'Product']) || '').trim();
+    const dateVal = col(row, ['ScheduledStartTime', 'Scheduled Start', 'ScheduledDate', 'Date']);
+    const dateStr = toDateStr(dateVal);
+    if (!dateStr || !faculty || !centre) return;
+
+    da[dateStr] = da[dateStr] || {};
+    da[dateStr][centre] = da[dateStr][centre] || {};
+    da[dateStr][centre][faculty] = (da[dateStr][centre][faculty] || 0) + 1;
+
+    if (product) products[product] = (products[product] || 0) + 1;
+  });
+
+  // Process Total Classes rows
+  totalRows.forEach(row => {
+    const faculty = cleanName(col(row, ['Faculty Name', 'FacultyName', 'Faculty']));
+    const centre  = String(col(row, ['Centre Name', 'Center Name', 'CentreName', 'Center']) || '').trim();
+    const dateVal = col(row, ['Actual Start Time', 'ActualStartTime', 'Date', 'Actual Start']);
+    const dateStr = toDateStr(dateVal);
+    if (!dateStr || !faculty || !centre) return;
+
+    ta[dateStr] = ta[dateStr] || {};
+    ta[dateStr][centre] = ta[dateStr][centre] || {};
+    ta[dateStr][centre][faculty] = (ta[dateStr][centre][faculty] || 0) + 1;
+  });
+
+  const allDates = [...new Set([...Object.keys(da), ...Object.keys(ta)])].sort();
+  if (!allDates.length) throw new Error('No valid date data found in the sheets. Please check column names.');
+
+  const minDate = allDates[0], maxDate = allDates[allDates.length-1];
+
+  // Unique months for quick filter
+  const monthSet = new Set(allDates.map(d => d.slice(0,7)));
+  const months = [...monthSet].sort();
+
+  // Unique centres
+  const centreSet = new Set();
+  allDates.forEach(d => {
+    Object.keys(da[d]||{}).forEach(c => centreSet.add(c));
+    Object.keys(ta[d]||{}).forEach(c => centreSet.add(c));
+  });
+  const centres = [...centreSet].filter(c=>c!=='Online').sort();
+
+  // Total counts for header chips
+  const totalDelaysAll = Object.values(da).reduce((s,cv)=>s+Object.values(cv).reduce((s2,fv)=>s2+Object.values(fv).reduce((a,b)=>a+b,0),0),0);
+  const totalClassesAll = Object.values(ta).reduce((s,cv)=>s+Object.values(cv).reduce((s2,fv)=>s2+Object.values(fv).reduce((a,b)=>a+b,0),0),0);
+
+  // Store globally
+  G = { ta, da, allDates, minDate, maxDate, months, centres, products, totalDelaysAll, totalClassesAll, filename };
+
+  buildUI();
+  hideLoading();
+  showDashboard();
+}
+
+// ── BUILD UI ───────────────────────────────────────────────────────────────
+function buildUI() {
+  // Header
+  document.getElementById('headerSub').textContent = `Offline Academics · ${G.filename}`;
+  document.getElementById('chipDelays').textContent = `${G.totalDelaysAll.toLocaleString()} delays`;
+  document.getElementById('chipClasses').textContent = `${G.totalClassesAll.toLocaleString()} classes`;
+  document.getElementById('chipCentres').textContent = `${G.centres.length} centres`;
+
+  // Month badges
+  const mb = document.getElementById('monthBadges');
+  mb.innerHTML = '';
+  G.months.forEach(m => {
+    const [y,mo] = m.split('-');
+    const label = new Date(+y,+mo-1,1).toLocaleString('en-IN',{month:'short'})+' '+y;
+    const btn = document.createElement('button');
+    btn.className='month-badge';
+    btn.textContent=label;
+    btn.onclick=()=>selectMonth(btn,m);
+    mb.appendChild(btn);
+  });
+  const allBtn = document.createElement('button');
+  allBtn.className='month-badge active';
+  allBtn.textContent='All';
+  allBtn.onclick=()=>selectMonth(allBtn,'');
+  mb.appendChild(allBtn);
+
+  // Date inputs
+  document.getElementById('fromDate').value = G.minDate;
+  document.getElementById('fromDate').min   = G.minDate;
+  document.getElementById('fromDate').max   = G.maxDate;
+  document.getElementById('toDate').value   = G.maxDate;
+  document.getElementById('toDate').min     = G.minDate;
+  document.getElementById('toDate').max     = G.maxDate;
+
+  // Centre dropdown
+  const sel = document.getElementById('centreSel');
+  sel.innerHTML = '<option value="">All centres</option>';
+  G.centres.forEach(c => {
+    const opt = document.createElement('option');
+    opt.value = c; opt.textContent = c;
+    sel.appendChild(opt);
+  });
+
+  applyFilters();
+}
+
+// ── APPLY FILTERS ─────────────────────────────────────────────────────────
+function applyFilters() {
+  const from = document.getElementById('fromDate').value;
+  const to   = document.getElementById('toDate').value;
+  const ctr  = document.getElementById('centreSel').value;
+
+  let totalClasses=0, totalDelays=0;
+  const facTotal={}, facDelay={}, ctrTotal={}, ctrDelay={}, dateTotal={}, dateDelay={}, facCentre={};
+
+  G.allDates.forEach(d => {
+    if (d < from || d > to) return;
+
+    // Total classes
+    const tDay = G.ta[d] || {};
+    const tC = ctr ? (tDay[ctr]?{[ctr]:tDay[ctr]}:{}) : tDay;
+    Object.entries(tC).forEach(([c,fm]) => Object.entries(fm).forEach(([f,cnt]) => {
+      totalClasses += cnt;
+      facTotal[f]   = (facTotal[f]||0)+cnt;
+      ctrTotal[c]   = (ctrTotal[c]||0)+cnt;
+      dateTotal[d]  = (dateTotal[d]||0)+cnt;
+      facCentre[f]  = facCentre[f]||{};
+      facCentre[f][c] = (facCentre[f][c]||0)+cnt;
+    }));
+
+    // Delays
+    const dDay = G.da[d] || {};
+    const dC = ctr ? (dDay[ctr]?{[ctr]:dDay[ctr]}:{}) : dDay;
+    Object.entries(dC).forEach(([c,fm]) => Object.entries(fm).forEach(([f,cnt]) => {
+      totalDelays += cnt;
+      facDelay[f]  = (facDelay[f]||0)+cnt;
+      ctrDelay[c]  = (ctrDelay[c]||0)+cnt;
+      dateDelay[d] = (dateDelay[d]||0)+cnt;
+    }));
+  });
+
+  const pct = totalClasses>0 ? (totalDelays/totalClasses*100) : 0;
+  const uniqFac = new Set(Object.keys(facTotal));
+
+  document.getElementById('kpiDelays').textContent    = totalDelays.toLocaleString();
+  document.getElementById('kpiTotal').textContent     = totalClasses.toLocaleString();
+  document.getElementById('kpiPct').textContent       = pct.toFixed(1)+'%';
+  document.getElementById('kpiFaculties').textContent = uniqFac.size;
+
+  renderCentreBars(ctrDelay, ctrTotal);
+  renderTrendChart(dateDelay, dateTotal);
+  renderRateChart(dateDelay, dateTotal);
+  renderProductChart();
+  buildTableRows(facDelay, facTotal, facCentre);
+  renderTable(document.getElementById('tableSearch').value);
+}
+
+// ── CENTRE BARS ───────────────────────────────────────────────────────────
+function renderCentreBars(ctrDelay, ctrTotal) {
+  const el = document.getElementById('centreBars');
+  el.innerHTML = '';
+  let sorted;
+  if (_centreTabMode === 'count') {
+    sorted = Object.entries(ctrDelay).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).slice(0,15)
+      .map(([c,d])=>({c,d,tot:ctrTotal[c]||0}));
+  } else {
+    sorted = Object.entries(ctrDelay)
+      .filter(([c,d])=>d>0&&(ctrTotal[c]||0)>=5)
+      .map(([c,d])=>({c,d,tot:ctrTotal[c]||0,p:d/(ctrTotal[c]||1)}))
+      .sort((a,b)=>b.p-a.p).slice(0,15);
+  }
+  if (!sorted.length){el.innerHTML='<div class="no-data">No delays in selection</div>';return;}
+  const maxVal = _centreTabMode==='count' ? sorted[0].d : sorted[0].p;
+  sorted.forEach(({c,d,tot}) => {
+    const pct = tot>0 ? d/tot*100 : 0;
+    const barVal = _centreTabMode==='count' ? d : pct/100;
+    const w = Math.round(barVal/maxVal*100);
+    const color = pct>=20?'var(--red)':pct>=10?'var(--amber)':'var(--accent)';
+    const row = document.createElement('div');
+    row.className='centre-bar-row';
+    row.innerHTML=`<span class="centre-name" title="${c}">${c}</span>
+      <div class="centre-bar-track"><div class="centre-bar-fill" style="width:${w}%;background:${color}"></div></div>
+      <span class="centre-val">${_centreTabMode==='count'?d:pct.toFixed(1)+'%'} <span style="color:var(--text3)">${_centreTabMode==='count'?'('+pct.toFixed(1)+'%)':'('+d+')'}</span></span>`;
+    el.appendChild(row);
+  });
+}
+
+function switchCentreTab(btn,mode){
+  _centreTabMode=mode;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  btn.classList.add('active');
+  applyFilters();
+}
+
+// ── TREND CHART ───────────────────────────────────────────────────────────
+function renderTrendChart(dateDelay, dateTotal) {
+  const mMap={};
+  G.months.forEach(m=>mMap[m]={d:0,t:0});
+  Object.entries(dateDelay).forEach(([d,v])=>{const m=d.slice(0,7);if(mMap[m])mMap[m].d+=v;});
+  Object.entries(dateTotal).forEach(([d,v])=>{const m=d.slice(0,7);if(mMap[m])mMap[m].t+=v;});
+  const labels=G.months.map(m=>{const[y,mo]=m.split('-');return new Date(+y,+mo-1,1).toLocaleString('en-IN',{month:'short'})+' '+y;});
+  const dVals=Object.values(mMap).map(m=>m.d);
+  const tVals=Object.values(mMap).map(m=>m.t);
+  if(trendChart)trendChart.destroy();
+  trendChart=new Chart(document.getElementById('trendChart').getContext('2d'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Total classes',data:tVals,backgroundColor:'rgba(59,130,246,0.25)',borderColor:'rgba(59,130,246,0.5)',borderWidth:1,borderRadius:4,yAxisID:'y1'},
+      {label:'Delays',data:dVals,backgroundColor:'#f97316',borderRadius:4,yAxisID:'y'}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},
+      plugins:{legend:{display:true,position:'top',labels:{color:'#8892a4',font:{size:11},boxWidth:12,padding:12}},
+        tooltip:{backgroundColor:'#1e2535',titleColor:'#e8eaf0',bodyColor:'#8892a4',borderColor:'#252d3f',borderWidth:1}},
+      scales:{
+        x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#5a6478',font:{size:11}}},
+        y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#5a6478',font:{size:11}},position:'left',title:{display:true,text:'Delays',color:'#5a6478',font:{size:10}}},
+        y1:{grid:{display:false},ticks:{color:'#5a6478',font:{size:11}},position:'right',title:{display:true,text:'Total classes',color:'#5a6478',font:{size:10}}}
+      }}
+  });
+}
+
+// ── RATE CHART ────────────────────────────────────────────────────────────
+function renderRateChart(dateDelay, dateTotal) {
+  const mMap={};
+  G.months.forEach(m=>mMap[m]={d:0,t:0});
+  Object.entries(dateDelay).forEach(([d,v])=>{const m=d.slice(0,7);if(mMap[m])mMap[m].d+=v;});
+  Object.entries(dateTotal).forEach(([d,v])=>{const m=d.slice(0,7);if(mMap[m])mMap[m].t+=v;});
+  const labels=G.months.map(m=>{const[y,mo]=m.split('-');return new Date(+y,+mo-1,1).toLocaleString('en-IN',{month:'short'})+' '+y;});
+  const rates=Object.values(mMap).map(m=>m.t>0?+(m.d/m.t*100).toFixed(2):0);
+  if(rateChart)rateChart.destroy();
+  rateChart=new Chart(document.getElementById('rateChart').getContext('2d'),{
+    type:'line',
+    data:{labels,datasets:[{label:'Delay Rate %',data:rates,borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,0.1)',borderWidth:2,pointBackgroundColor:'#22c55e',pointRadius:5,fill:true,tension:0.35}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#1e2535',titleColor:'#e8eaf0',bodyColor:'#8892a4',borderColor:'#252d3f',borderWidth:1,callbacks:{label:ctx=>` ${ctx.raw}% delay rate`}}},
+      scales:{x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#5a6478',font:{size:11}}},y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#5a6478',font:{size:11},callback:v=>v+'%'},min:0}}}
+  });
+}
+
+// ── PRODUCT CHART ─────────────────────────────────────────────────────────
+function renderProductChart() {
+  const prods = G.products;
+  const labels = Object.keys(prods).sort((a,b)=>prods[b]-prods[a]);
+  const vals   = labels.map(l=>prods[l]);
+  const total  = vals.reduce((a,b)=>a+b,0)||1;
+  const colors = ['#f97316','#a78bfa','#3b82f6','#22c55e','#f59e0b','#ef4444','#06b6d4'];
+  if(productChart)productChart.destroy();
+  productChart=new Chart(document.getElementById('productChart').getContext('2d'),{
+    type:'doughnut',
+    data:{labels,datasets:[{data:vals,backgroundColor:colors.slice(0,labels.length),borderColor:'#161b27',borderWidth:3,hoverOffset:8}]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{position:'right',labels:{color:'#8892a4',font:{size:11},padding:12,boxWidth:12}},
+        tooltip:{backgroundColor:'#1e2535',titleColor:'#e8eaf0',bodyColor:'#8892a4',borderColor:'#252d3f',borderWidth:1,
+          callbacks:{label:ctx=>` ${ctx.label}: ${ctx.raw} (${(ctx.raw/total*100).toFixed(1)}%)`}}}}
+  });
+}
+
+// ── TABLE ─────────────────────────────────────────────────────────────────
+function buildTableRows(facDelay, facTotal, facCentre) {
+  _tableRows = Object.entries(facTotal).map(([f,tot]) => {
+    const d   = facDelay[f]||0;
+    const pct = tot>0?(d/tot*100):0;
+    const cmap = facCentre[f]||{};
+    const primaryCentre = Object.entries(cmap).sort((a,b)=>b[1]-a[1])[0]?.[0]||'—';
+    return {faculty:f,delays:d,total:tot,pct,centre:primaryCentre};
+  });
+  _tableRows.sort((a,b)=>b.delays-a.delays);
+  _sortCol='delays';_sortAsc=false;
+  ['delays','total','pct','faculty','centre'].forEach(c=>{const e=document.getElementById('sort-'+c);if(e)e.textContent='';});
+  const e=document.getElementById('sort-delays');if(e)e.textContent='↓';
+}
+
+function sortTable(col) {
+  if(_sortCol===col)_sortAsc=!_sortAsc;
+  else{_sortCol=col;_sortAsc=(col==='faculty'||col==='centre');}
+  ['delays','total','pct','faculty','centre'].forEach(c=>{const e=document.getElementById('sort-'+c);if(e)e.textContent='';});
+  const e=document.getElementById('sort-'+col);if(e)e.textContent=_sortAsc?'↑':'↓';
+  _tableRows.sort((a,b)=>{
+    const v=(col==='faculty'||col==='centre')?a[col].localeCompare(b[col]):a[col]-b[col];
+    return _sortAsc?v:-v;
+  });
+  renderTable(document.getElementById('tableSearch').value);
+}
+
+function renderTable(search='') {
+  const rows=search?_tableRows.filter(r=>r.faculty.toLowerCase().includes(search.toLowerCase())||r.centre.toLowerCase().includes(search.toLowerCase())):_tableRows;
+  const tbody=document.getElementById('facTableBody');
+  tbody.innerHTML='';
+  if(!rows.length){tbody.innerHTML='<tr><td colspan="6" class="no-data">No data for this selection</td></tr>';return;}
+  rows.slice(0,300).forEach((r,i)=>{
+    const p=r.pct;
+    const[badgeCls,barCls]=p>=15?['pct-high','fill-high']:p>=8?['pct-mid','fill-mid']:['pct-low','fill-low'];
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td><span class="rank-num">${i+1}</span></td>
+      <td class="fac-name">${r.faculty||'—'}</td>
+      <td style="font-size:12px;color:var(--text2)">${r.centre}</td>
+      <td class="num">${r.delays.toLocaleString()}</td>
+      <td class="num">${r.total.toLocaleString()}</td>
+      <td><div class="pct-bar-wrap">
+        <div class="mini-bar"><div class="mini-fill ${barCls}" style="width:${Math.min(100,p).toFixed(1)}%"></div></div>
+        <span class="pct-badge ${badgeCls}">${p.toFixed(1)}%</span>
+      </div></td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function filterTable(q){renderTable(q);}
+
+// ── MONTH / RESET ─────────────────────────────────────────────────────────
+function selectMonth(btn, month) {
+  document.querySelectorAll('.month-badge').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  if (month) {
+    const[y,m]=month.split('-');
+    const last=new Date(+y,+m,0).getDate();
+    document.getElementById('fromDate').value=`${y}-${m}-01`;
+    document.getElementById('toDate').value=`${y}-${m}-${String(last).padStart(2,'0')}`;
+  } else {
+    document.getElementById('fromDate').value=G.minDate;
+    document.getElementById('toDate').value=G.maxDate;
+  }
+  applyFilters();
+}
+
+function resetFilters(){
+  document.getElementById('fromDate').value=G.minDate;
+  document.getElementById('toDate').value=G.maxDate;
+  document.getElementById('centreSel').value='';
+  document.querySelectorAll('.month-badge').forEach(b=>b.classList.remove('active'));
+  document.querySelector('#monthBadges .month-badge:last-child').classList.add('active');
+  applyFilters();
+}
+
+// ── SCREEN TRANSITIONS ────────────────────────────────────────────────────
+function showLoading(msg){
+  document.getElementById('uploadScreen').style.display='none';
+  document.getElementById('loadingScreen').style.display='flex';
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('loadingText').textContent=msg;
+}
+function setLoading(msg){document.getElementById('loadingText').textContent=msg;}
+function hideLoading(){document.getElementById('loadingScreen').style.display='none';}
+function showDashboard(){document.getElementById('dashboard').style.display='block';}
+function showError(msg){
+  const el=document.getElementById('errorBox');
+  el.textContent=msg;
+  el.style.display=msg?'block':'none';
+}
+function resetToUpload(){
+  document.getElementById('uploadScreen').style.display='flex';
+  document.getElementById('dashboard').style.display='none';
+  document.getElementById('fileInput').value='';
+  if(trendChart)trendChart.destroy();
+  if(productChart)productChart.destroy();
+  if(rateChart)rateChart.destroy();
+}
+</script>
+</body>
+</html>
